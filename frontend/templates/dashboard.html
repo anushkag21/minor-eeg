@@ -1,0 +1,326 @@
+{% extends "base.html" %}
+{% block title %}Live Test – NeuroGuard Clinic{% endblock %}
+
+{% block content %}
+<!-- Dashboard Header -->
+<div class="dashboard-header">
+    <div class="container-fluid px-4">
+        <div class="row align-items-center g-3">
+            <!-- Patient Info & Timer -->
+            <div class="col-lg-3">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="patient-avatar">
+                        <i class="bi bi-person-fill"></i>
+                    </div>
+                    <div>
+                        <small class="text-muted">Patient ID</small>
+                        <h5 class="mb-0 fw-bold" id="patientId">{{ patient_id }}</h5>
+                    </div>
+                </div>
+            </div>
+            <!-- Timer -->
+            <div class="col-lg-2">
+                <div class="timer-display text-center">
+                    <small class="text-muted d-block">Session Timer</small>
+                    <span class="timer-value" id="sessionTimer">00:00</span>
+                </div>
+            </div>
+            <!-- Sensor Status -->
+            <div class="col-lg-4">
+                <div class="sensor-status-bar d-flex gap-2 flex-wrap justify-content-center">
+                    {% for key, sensor in sensor_status.items() %}
+                    <div class="sensor-badge" id="sensor-{{ key }}" data-sensor="{{ key }}">
+                        <span class="sensor-dot {{ 'online' if sensor.online else 'offline' }}"></span>
+                        <span class="sensor-name">{{ sensor.label }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            <!-- Live Score -->
+            <div class="col-lg-3">
+                <div class="live-score-container text-center">
+                    <small class="text-muted d-block">Depression Score</small>
+                    <div class="live-score" id="liveScore">
+                        <span class="score-value">0</span>
+                        <span class="score-max">/27</span>
+                    </div>
+                    <div class="severity-badge" id="severityBadge">Normal</div>
+                    <div class="confidence-text" id="confidenceText">Confidence: ---%</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Main Dashboard Grid -->
+<div class="container-fluid px-4 py-3">
+    <div class="row g-3">
+
+        <!-- LEFT: Camera Feed -->
+        <div class="col-lg-4">
+            <div class="glass-card dash-panel h-100">
+                <div class="panel-header">
+                    <h6 class="panel-title"><i class="bi bi-camera-video me-2"></i>Live Camera Feed</h6>
+                    <span class="badge bg-success-subtle text-success" id="cameraStatusBadge">
+                        <i class="bi bi-circle-fill blink-dot me-1"></i>LIVE
+                    </span>
+                </div>
+                <div class="camera-container" id="cameraContainer">
+                    <video id="cameraFeed" autoplay muted playsinline></video>
+                    <canvas id="cameraOverlay"></canvas>
+                    <div class="camera-offline-msg" id="cameraOfflineMsg" style="display:none;">
+                        <i class="bi bi-camera-video-off"></i>
+                        <p>Camera unavailable</p>
+                        <small>Using sensor data + questions only</small>
+                    </div>
+                </div>
+                <!-- Camera Metrics -->
+                <div class="camera-metrics mt-3">
+                    <div class="row g-2">
+                        <div class="col-4">
+                            <div class="metric-mini">
+                                <span class="metric-mini-label">Blinks/min</span>
+                                <span class="metric-mini-value" id="blinkRate">--</span>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="metric-mini">
+                                <span class="metric-mini-label">Expression</span>
+                                <span class="metric-mini-value" id="facialExpression">--</span>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="metric-mini">
+                                <span class="metric-mini-label">Posture</span>
+                                <span class="metric-mini-value" id="postureScore">--%</span>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Expression Breakdown -->
+                    <div class="expression-bars mt-3">
+                        <div class="expression-row">
+                            <span class="expr-label">Neutral</span>
+                            <div class="expr-bar-track"><div class="expr-bar expr-neutral" id="exprNeutral" style="width:0%"></div></div>
+                            <span class="expr-pct" id="exprNeutralPct">0%</span>
+                        </div>
+                        <div class="expression-row">
+                            <span class="expr-label">Sad</span>
+                            <div class="expr-bar-track"><div class="expr-bar expr-sad" id="exprSad" style="width:0%"></div></div>
+                            <span class="expr-pct" id="exprSadPct">0%</span>
+                        </div>
+                        <div class="expression-row">
+                            <span class="expr-label">Happy</span>
+                            <div class="expr-bar-track"><div class="expr-bar expr-happy" id="exprHappy" style="width:0%"></div></div>
+                            <span class="expr-pct" id="exprHappyPct">0%</span>
+                        </div>
+                        <div class="expression-row">
+                            <span class="expr-label">Anxious</span>
+                            <div class="expr-bar-track"><div class="expr-bar expr-anxious" id="exprAnxious" style="width:0%"></div></div>
+                            <span class="expr-pct" id="exprAnxiousPct">0%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CENTER: Charts -->
+        <div class="col-lg-4">
+            <div class="d-flex flex-column gap-3 h-100">
+                <!-- EEG Chart -->
+                <div class="glass-card dash-panel flex-fill">
+                    <div class="panel-header">
+                        <h6 class="panel-title"><i class="bi bi-braces me-2"></i>EEG / EMG Waveform</h6>
+                        <span class="badge bg-info-subtle text-info" id="eegStatus">
+                            <i class="bi bi-circle-fill blink-dot me-1"></i>LIVE
+                        </span>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="eegChart"></canvas>
+                    </div>
+                    <div class="chart-legend-custom mt-2">
+                        <span><span class="legend-dot" style="background:#00e5ff"></span>Alpha</span>
+                        <span><span class="legend-dot" style="background:#76ff03"></span>Beta</span>
+                        <span><span class="legend-dot" style="background:#ffab40"></span>Theta</span>
+                        <span><span class="legend-dot" style="background:#e040fb"></span>Delta</span>
+                    </div>
+                </div>
+                <!-- HRV Chart -->
+                <div class="glass-card dash-panel flex-fill">
+                    <div class="panel-header">
+                        <h6 class="panel-title"><i class="bi bi-heart-pulse me-2"></i>Heart Rate Variability</h6>
+                        <span class="badge bg-danger-subtle text-danger" id="hrvStatus">
+                            <i class="bi bi-circle-fill blink-dot me-1"></i>LIVE
+                        </span>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="hrvChart"></canvas>
+                    </div>
+                    <div class="d-flex justify-content-around mt-2">
+                        <div class="text-center">
+                            <small class="text-muted d-block">BPM</small>
+                            <strong id="bpmValue">--</strong>
+                        </div>
+                        <div class="text-center">
+                            <small class="text-muted d-block">RMSSD</small>
+                            <strong id="rmssdValue">--</strong>
+                        </div>
+                        <div class="text-center">
+                            <small class="text-muted d-block">SpO₂</small>
+                            <strong id="spo2Value">--%</strong>
+                        </div>
+                    </div>
+                </div>
+                <!-- Fusion Score Chart -->
+                <div class="glass-card dash-panel flex-fill">
+                    <div class="panel-header">
+                        <h6 class="panel-title"><i class="bi bi-graph-up me-2"></i>Multimodal Fusion Score</h6>
+                        <span class="badge bg-warning-subtle text-warning">
+                            <i class="bi bi-cpu me-1"></i>AI
+                        </span>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="fusionChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT: Questions -->
+        <div class="col-lg-4">
+            <div class="glass-card dash-panel h-100 d-flex flex-column">
+                <div class="panel-header">
+                    <h6 class="panel-title"><i class="bi bi-chat-square-text me-2"></i>Adaptive Assessment</h6>
+                    <span class="badge bg-accent-badge" id="questionProgress">0 / {{ questions|length }}</span>
+                </div>
+                <!-- Progress Bar -->
+                <div class="question-progress-bar mb-3">
+                    <div class="progress" style="height: 6px;">
+                        <div class="progress-bar bg-accent" role="progressbar" style="width: 0%"
+                             id="questionProgressBar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                </div>
+                <!-- Question Cards -->
+                <div class="questions-container flex-grow-1" id="questionsContainer">
+                    {% for q in questions %}
+                    <div class="question-card" id="question-{{ q.id }}"
+                         {% if not loop.first %}style="display:none;"{% endif %}>
+                        <div class="question-number">
+                            <span class="q-source-badge">{{ q.source }}</span>
+                            Question {{ loop.index }} of {{ questions|length }}
+                        </div>
+                        <p class="question-text">{{ q.text }}</p>
+                        <div class="question-options">
+                            {% for opt in q.options %}
+                            <label class="option-label" id="option-{{ q.id }}-{{ opt.value }}">
+                                <input type="radio" name="q_{{ q.id }}" value="{{ opt.value }}"
+                                       onchange="submitAnswer({{ q.id }}, {{ opt.value }})">
+                                <span class="option-custom-radio"></span>
+                                <span class="option-text">{{ opt.label }}</span>
+                                <span class="option-score">{{ opt.value }}</span>
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                    <!-- Adaptive Question Placeholder -->
+                    <div class="question-card" id="adaptiveQuestionSlot" style="display:none;">
+                        <div class="question-number">
+                            <span class="q-source-badge ai-badge">AI-Generated</span>
+                            <span id="adaptiveQNum">Adaptive</span>
+                        </div>
+                        <p class="question-text" id="adaptiveQText"></p>
+                        <div class="question-options" id="adaptiveQOptions"></div>
+                    </div>
+                    <!-- Completion Message -->
+                    <div class="question-complete text-center py-4" id="questionsComplete" style="display:none;">
+                        <div class="complete-icon mb-3">
+                            <i class="bi bi-check-circle-fill"></i>
+                        </div>
+                        <h5>Assessment Complete</h5>
+                        <p class="text-muted">All questions answered. Click "End & Generate Report" below.</p>
+                    </div>
+                </div>
+
+                <!-- Fallback Notice -->
+                <div class="fallback-notice" id="fallbackNotice" style="display:none;">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <span id="fallbackMessage">Some sensors offline – results based on available data</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bottom Control Bar -->
+<div class="control-bar">
+    <div class="container-fluid px-4">
+        <div class="row align-items-center g-2">
+            <div class="col-md-4">
+                <div class="d-flex gap-2">
+                    <button class="btn btn-accent btn-lg" id="btnStartTest" onclick="startTest()">
+                        <i class="bi bi-play-fill me-1"></i>Start Test
+                    </button>
+                    <button class="btn btn-outline-light btn-lg" id="btnPauseTest" onclick="pauseTest()" disabled>
+                        <i class="bi bi-pause-fill me-1"></i>Pause
+                    </button>
+                    <button class="btn btn-danger btn-lg" id="btnEndTest" onclick="endTest()" disabled>
+                        <i class="bi bi-stop-fill me-1"></i>End & Generate Report
+                    </button>
+                </div>
+            </div>
+            <div class="col-md-4 text-center">
+                <div class="mode-indicator" id="modeIndicator">
+                    <i class="bi bi-shield-check me-1"></i>
+                    <span id="modeText">Ready – Click Start to begin</span>
+                </div>
+            </div>
+            <div class="col-md-4 text-end">
+                <div class="d-flex align-items-center justify-content-end gap-3">
+                    <span class="confidence-live" id="liveConfidence">
+                        <i class="bi bi-graph-up me-1"></i>Confidence: <strong>---%</strong>
+                    </span>
+                    <a href="#" class="btn btn-outline-accent" id="btnDownloadPdf" style="display:none;">
+                        <i class="bi bi-file-earmark-pdf me-1"></i>Download PDF
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Result Modal -->
+<div class="modal fade" id="resultModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content glass-card border-0">
+            <div class="modal-header border-0">
+                <h5 class="modal-title"><i class="bi bi-clipboard2-check me-2"></i>Test Complete</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center py-4">
+                <div class="result-score-circle mb-3" id="resultScoreCircle">
+                    <span class="result-score-number" id="resultScore">0</span>
+                    <span class="result-score-label">/27</span>
+                </div>
+                <h4 id="resultSeverity" class="mb-2">--</h4>
+                <p class="text-muted" id="resultMessage">Processing...</p>
+                <div class="mt-4 d-flex justify-content-center gap-3">
+                    <a href="#" class="btn btn-accent" id="resultReportLink">
+                        <i class="bi bi-file-earmark-medical me-1"></i>View Full Report
+                    </a>
+                    <button class="btn btn-outline-light" data-bs-dismiss="modal">
+                        <i class="bi bi-arrow-repeat me-1"></i>New Test
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const QUESTIONS = {{ questions | tojson }};
+    const TOTAL_QUESTIONS = QUESTIONS.length;
+</script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}
