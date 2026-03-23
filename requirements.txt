@@ -1,10 +1,10 @@
 flask==3.1.0
-mysql-connector-python==9.1.0
-groq==0.18.0
+mysql-connector-python==9.2.0
+groq==0.20.0
 pyserial==3.5
 pdfkit==1.0.0
 opencv-python==4.10.0.84
 mediapipe==0.10.21
-numpy==2.2.3
-scipy==1.15.2
-tensorflow==2.18.0
+numpy==1.26.4
+scipy==1.13.1
+tensorflow==2.19.1
